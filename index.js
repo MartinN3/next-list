@@ -42,17 +42,6 @@ Object.fromEntries(
     ])
 );
 
-const appDirectory = fs.existsSync(path.join(process.cwd(), 'app'))
-    ? path.join(process.cwd(), 'app')
-    : fs.existsSync(path.join(process.cwd(), 'src/app'))
-        ? path.join(process.cwd(), 'src/app')
-        : null;
-
-if (!appDirectory) {
-    console.error('🚫 This tool only works with projects using an "app" directory.'.yellow);
-    process.exit(1);
-}
-
 const fileContentsCache = new Map();
 
 let currentFilePath = null;
@@ -287,16 +276,53 @@ function isClientComponent() {
     return currentFileContent.includes('use client');
 }
 
-console.log('Listing routes in src/app:');
-const arg = process.argv[2];
+function getRoutesForSitemap() {
+    const appDirectory = fs.existsSync(path.join(process.cwd(), 'app'))
+        ? path.join(process.cwd(), 'app')
+        : fs.existsSync(path.join(process.cwd(), 'src/app'))
+            ? path.join(process.cwd(), 'src/app')
+            : null;
 
-if (!arg || arg === 'pages') {
-    const routesTable = listRoutes(appDirectory);
-    renderTable(routesTable, 'pages');
+    if (!appDirectory) {
+        console.error('🚫 This tool only works with projects using an "app" directory.'.yellow);
+        process.exit(1);
+    }
+
+    const routes = listRoutes(appDirectory);
+    return routes.filter(route => /\[.*\]/.test(route[1]) === false).map(route => ({
+        path: route[1].replace(/\/$/, '').replace(/\(.*\)\/?/, ''), // replace /(home) with / and /(something)/test with /test
+        dynamic: !!route[5],
+        lastModified: new Date().toISOString()
+    }));
 }
 
-if (!arg || arg === 'api') {
-    const apiRoutesTable = listApiRoutes(appDirectory);
-    renderTable(apiRoutesTable, 'api');
-}
+if (require.main === module) {
+    const appDirectory = fs.existsSync(path.join(process.cwd(), 'app'))
+        ? path.join(process.cwd(), 'app')
+        : fs.existsSync(path.join(process.cwd(), 'src/app'))
+            ? path.join(process.cwd(), 'src/app')
+            : null;
 
+    if (!appDirectory) {
+        console.error('🚫 This tool only works with projects using an "app" directory.'.yellow);
+        process.exit(1);
+    }
+
+    console.log('Listing routes in src/app:');
+    const arg = process.argv[2];
+
+    if (!arg || arg === 'pages') {
+        const routesTable = listRoutes(appDirectory);
+        renderTable(routesTable, 'pages');
+    }
+
+    if (!arg || arg === 'api') {
+        const apiRoutesTable = listApiRoutes(appDirectory);
+        renderTable(apiRoutesTable, 'api');
+    }
+} else {
+    module.exports = {
+        listRoutes,
+        getRoutesForSitemap
+    };
+}
